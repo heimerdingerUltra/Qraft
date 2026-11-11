@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qraft-eval"
+version = "0.1.0"
+description = "Harnais d'évaluation de Qraft : jeux or, précision d'exécution, baseline (phase 0)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "sqlglot>=26",
+    "sqlalchemy>=2.0.40",
+    "pydantic>=2.11",
+    "pyyaml>=6.0.2",
+]
+
+[project.optional-dependencies]
+# Runner baseline : appelle Claude via le SDK officiel.
+baseline = ["anthropic>=0.75"]
+# Base de démonstration et sources DuckDB.
+duckdb = ["duckdb>=1.4", "duckdb-engine>=0.15"]
+dev = ["pytest>=8.4"]
+
+[project.scripts]
+qraft-eval = "qraft_eval.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qraft_eval"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

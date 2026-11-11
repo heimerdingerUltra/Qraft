@@ -1,0 +1,23 @@
+# Modèle de jeu or pour le domaine pilote. Copie ce fichier, renomme-le, puis remplis-le
+# avec les experts métier. Règles d'écriture : voir phase0/PHASE0.md.
+
+domain: nom-du-domaine          # ex. finance, ventes, rh
+dialect: postgres               # dialecte SQLGlot : postgres, snowflake, tsql, oracle, mysql, bigquery, duckdb...
+description: Une phrase sur le périmètre de la base pilote.
+
+questions:
+  - id: q001                    # identifiant unique et stable
+    question: La question telle qu'un utilisateur métier la poserait.
+    difficulty: facile          # facile | moyen | difficile
+    tags: [comptage, période]   # libres : servent au découpage des résultats
+    qir_expressible: null       # true | false | null (non annotée) — voir « QIR v0 » dans PHASE0.md
+    notes: Règle métier ou piège à connaître, s'il y en a.
+    sql: |
+      SELECT ...                -- référence validée par un expert ; précise le format attendu
+
+  - id: q002
+    question: Une question à laquelle la base ne permet pas de répondre.
+    difficulty: moyen
+    tags: [sans-réponse]
+    answerable: false           # pas de SQL : le système doit s'abstenir
+    notes: Pourquoi la base ne permet pas d'y répondre.

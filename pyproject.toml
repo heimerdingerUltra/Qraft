@@ -1,0 +1,5 @@
+# Racine du workspace uv de Qraft (racine virtuelle : aucun paquet ici).
+# Chaque paquet vit dans packages/<nom>/ avec son propre pyproject.toml.
+
+[tool.uv.workspace]
+members = ["packages/*"]

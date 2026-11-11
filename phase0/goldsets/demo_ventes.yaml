@@ -1,0 +1,208 @@
+# Jeu or de démonstration, sur la base générée par « qraft-eval demo-db ».
+# Il sert à tester le harnais, pas à mesurer quoi que ce soit de réel.
+#
+# Règle maison volontairement absente du schéma : le chiffre d'affaires (CA) ne compte
+# que les commandes au statut 'payee' (les statuts 'test' et 'annulee' en sont exclus).
+# CA = somme de quantite × prix_unitaire sur lignes_commande.
+
+domain: ventes-demo
+dialect: duckdb
+description: Base fictive de ventes B2B (régions, clients, produits, commandes, paiements).
+
+questions:
+  - id: q001
+    question: Combien de clients avons-nous ?
+    difficulty: facile
+    tags: [comptage]
+    qir_expressible: true
+    sql: SELECT COUNT(*) AS nb_clients FROM clients
+
+  - id: q002
+    question: Combien de commandes payées ont été passées en 2025 ?
+    difficulty: facile
+    tags: [comptage, période]
+    qir_expressible: true
+    sql: |
+      SELECT COUNT(*) AS nb_commandes
+      FROM commandes
+      WHERE statut = 'payee'
+        AND date_commande >= DATE '2025-01-01' AND date_commande < DATE '2026-01-01'
+
+  - id: q003
+    question: Quel est le chiffre d'affaires total en 2025 ?
+    difficulty: moyen
+    tags: [métrique-métier, période]
+    qir_expressible: true
+    notes: La règle « commandes payées uniquement » n'est pas dans le schéma.
+    sql: |
+      SELECT SUM(l.quantite * l.prix_unitaire) AS ca
+      FROM lignes_commande l
+      JOIN commandes c ON c.commande_id = l.commande_id
+      WHERE c.statut = 'payee'
+        AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+
+  - id: q004
+    question: Donne le chiffre d'affaires 2025 par région, de la plus forte à la plus faible.
+    difficulty: moyen
+    tags: [métrique-métier, période, classement, jointure]
+    qir_expressible: true
+    sql: |
+      SELECT r.nom AS region, SUM(l.quantite * l.prix_unitaire) AS ca
+      FROM lignes_commande l
+      JOIN commandes c ON c.commande_id = l.commande_id
+      JOIN clients cl ON cl.client_id = c.client_id
+      JOIN regions r ON r.region_id = cl.region_id
+      WHERE c.statut = 'payee'
+        AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+      GROUP BY r.nom
+      ORDER BY ca DESC
+
+  - id: q005
+    question: Quels sont les 5 produits les plus vendus en quantité en 2025 (commandes payées) ?
+    difficulty: moyen
+    tags: [classement, période, jointure]
+    qir_expressible: true
+    notes: Départage alphabétique en cas d'égalité ; une prédiction qui départage autrement peut échouer.
+    sql: |
+      SELECT p.nom AS produit, SUM(l.quantite) AS quantite
+      FROM lignes_commande l
+      JOIN commandes c ON c.commande_id = l.commande_id
+      JOIN produits p ON p.produit_id = l.produit_id
+      WHERE c.statut = 'payee'
+        AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+      GROUP BY p.nom
+      ORDER BY quantite DESC, produit
+      LIMIT 5
+
+  - id: q006
+    question: Pour chaque segment de clientèle, donne le chiffre d'affaires 2025 et le montant total encaissé en 2025.
+    difficulty: difficile
+    tags: [métrique-métier, piège-de-grain, jointure]
+    qir_expressible: true
+    notes: >
+      Piège de grain (fan trap) : joindre lignes_commande et paiements au niveau de la commande
+      double les montants. Encaissé = paiements datés de 2025, quelle que soit la date de commande.
+    sql: |
+      WITH ca AS (
+        SELECT cl.segment, SUM(l.quantite * l.prix_unitaire) AS ca
+        FROM lignes_commande l
+        JOIN commandes c ON c.commande_id = l.commande_id
+        JOIN clients cl ON cl.client_id = c.client_id
+        WHERE c.statut = 'payee'
+          AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+        GROUP BY cl.segment
+      ),
+      encaisse AS (
+        SELECT cl.segment, SUM(p.montant) AS encaisse
+        FROM paiements p
+        JOIN commandes c ON c.commande_id = p.commande_id
+        JOIN clients cl ON cl.client_id = c.client_id
+        WHERE p.date_paiement >= DATE '2025-01-01' AND p.date_paiement < DATE '2026-01-01'
+        GROUP BY cl.segment
+      )
+      SELECT ca.segment, ca.ca, COALESCE(e.encaisse, 0) AS encaisse
+      FROM ca
+      LEFT JOIN encaisse e ON e.segment = ca.segment
+
+  - id: q007
+    question: Quel est le panier moyen des commandes payées en 2025 ?
+    difficulty: moyen
+    tags: [métrique-métier, période]
+    qir_expressible: true
+    notes: Panier moyen = CA / nombre de commandes payées.
+    sql: |
+      SELECT SUM(l.quantite * l.prix_unitaire) / COUNT(DISTINCT c.commande_id) AS panier_moyen
+      FROM lignes_commande l
+      JOIN commandes c ON c.commande_id = l.commande_id
+      WHERE c.statut = 'payee'
+        AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+
+  - id: q008
+    question: Quelle est l'évolution du chiffre d'affaires entre 2024 et 2025 par catégorie de produit, en pourcentage ?
+    difficulty: difficile
+    tags: [métrique-métier, comparaison-temporelle, jointure]
+    qir_expressible: true
+    sql: |
+      WITH par_annee AS (
+        SELECT p.categorie, EXTRACT(year FROM c.date_commande) AS annee,
+               SUM(l.quantite * l.prix_unitaire) AS ca
+        FROM lignes_commande l
+        JOIN commandes c ON c.commande_id = l.commande_id
+        JOIN produits p ON p.produit_id = l.produit_id
+        WHERE c.statut = 'payee'
+          AND c.date_commande >= DATE '2024-01-01' AND c.date_commande < DATE '2026-01-01'
+        GROUP BY p.categorie, EXTRACT(year FROM c.date_commande)
+      )
+      SELECT categorie,
+             100.0 * (SUM(CASE WHEN annee = 2025 THEN ca END) - SUM(CASE WHEN annee = 2024 THEN ca END))
+               / SUM(CASE WHEN annee = 2024 THEN ca END) AS evolution_pct
+      FROM par_annee
+      GROUP BY categorie
+
+  - id: q009
+    question: Combien de clients sont situés en Île-de-France ?
+    difficulty: facile
+    tags: [comptage, valeur, jointure]
+    qir_expressible: true
+    sql: |
+      SELECT COUNT(*) AS nb_clients
+      FROM clients cl
+      JOIN regions r ON r.region_id = cl.region_id
+      WHERE r.code = 'IDF'
+
+  - id: q010
+    question: Quels clients n'ont passé aucune commande payée en 2025 ?
+    difficulty: moyen
+    tags: [négation, période]
+    qir_expressible: false
+    notes: Anti-jointure (« aucune commande ») non exprimable en QIR v0.
+    sql: |
+      SELECT cl.nom
+      FROM clients cl
+      WHERE NOT EXISTS (
+        SELECT 1 FROM commandes c
+        WHERE c.client_id = cl.client_id AND c.statut = 'payee'
+          AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+      )
+
+  - id: q011
+    question: Quelle est la marge brute par produit ?
+    difficulty: moyen
+    tags: [sans-réponse]
+    answerable: false
+    notes: Aucun coût d'achat dans la base.
+
+  - id: q012
+    question: Quel est le taux de satisfaction de nos clients ?
+    difficulty: facile
+    tags: [sans-réponse]
+    answerable: false
+    notes: Aucune donnée de satisfaction dans la base.
+
+  - id: q013
+    question: Quelle est la part du canal web dans le chiffre d'affaires de chaque mois de 2025, en pourcentage ? Identifie chaque mois par sa date de début.
+    difficulty: difficile
+    tags: [métrique-métier, part, période]
+    qir_expressible: true
+    sql: |
+      SELECT CAST(date_trunc('month', c.date_commande) AS DATE) AS mois,
+             100.0 * SUM(CASE WHEN c.canal = 'web' THEN l.quantite * l.prix_unitaire ELSE 0 END)
+               / SUM(l.quantite * l.prix_unitaire) AS part_web_pct
+      FROM lignes_commande l
+      JOIN commandes c ON c.commande_id = l.commande_id
+      WHERE c.statut = 'payee'
+        AND c.date_commande >= DATE '2025-01-01' AND c.date_commande < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
+
+  - id: q014
+    question: Combien de nouveaux clients avons-nous gagnés chaque trimestre de 2025 ? Identifie chaque trimestre par sa date de début.
+    difficulty: moyen
+    tags: [comptage, période]
+    qir_expressible: true
+    sql: |
+      SELECT CAST(date_trunc('quarter', date_creation) AS DATE) AS trimestre, COUNT(*) AS nouveaux_clients
+      FROM clients
+      WHERE date_creation >= DATE '2025-01-01' AND date_creation < DATE '2026-01-01'
+      GROUP BY 1
+      ORDER BY 1
