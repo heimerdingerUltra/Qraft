@@ -79,3 +79,10 @@ test('Prénom composé et mention d’un tiers', () => {
     false,
   );
 });
+test('Le bilan compte les questions manquées dans le dénominateur', async () => {
+  const {reviewSummary}=await import('../public/engine.mjs');
+  const lines=reviewSummary([{review:'Réponse utile',record:{timing:{first:250}}},{review:'Question pour moi manquée'},{review:'Question pour un autre participant'},{}]).join(' ');
+  assert.match(lines,/1 \/ 2 questions/);
+  assert.match(lines,/250 ms/);
+  assert.match(lines,/à tort : 1/);
+});

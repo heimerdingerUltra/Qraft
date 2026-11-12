@@ -4,6 +4,7 @@ import {
   evidenceFor,
   addressed,
   firstAnswer,
+  reviewSummary,
 } from './engine.mjs';
 const $ = (id) => document.getElementById(id);
 const docs = [],
@@ -196,8 +197,10 @@ function show(acousticEnd) {
     .catch((err) => {
       if (!controller.signal.aborted) $('deep').textContent = err.message;
     });
+  return record;
 }
 function receive(channel, text, final, acousticEnd) {
+  let record;
   $(channel).textContent = text;
   if (channel === 'remote') {
     last = text;
@@ -216,7 +219,7 @@ function receive(channel, text, final, acousticEnd) {
     }
     if (final && direct) {
       const knownEnd = session.clipStart + session.clipEnd * 1000;
-      show(
+      record = show(
         Number.isFinite(knownEnd) && performance.now() >= knownEnd
           ? knownEnd
           : acousticEnd,
@@ -227,7 +230,7 @@ function receive(channel, text, final, acousticEnd) {
     const seconds = Math.floor((performance.now() - session.started) / 1000);
     const time =
       Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
-    history.push({ channel, text, time, at: performance.now() });
+    history.push({ channel, text, time, record, at: performance.now() });
     const li = document.createElement('li');
     li.textContent =
       time +
@@ -236,10 +239,6 @@ function receive(channel, text, final, acousticEnd) {
       ' — ' +
       text;
     if (channel === 'remote') {
-      const record =
-        final && suggestions.at(-1)?.question === text
-          ? suggestions.at(-1)
-          : null;
       const review = document.createElement('select');
       review.setAttribute('aria-label', 'Évaluer cette intervention');
       const choices = record
@@ -512,6 +511,7 @@ $('export').onclick = () => {
         (t.review ? ' [' + t.review + ']' : ''),
     ),
     '',
+    ...reviewSummary(history),
     '## Suggestions de l’assistant',
     '',
   ];

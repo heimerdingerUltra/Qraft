@@ -163,3 +163,17 @@ export function firstAnswer(question, evidence) {
     return 'Le dossier donne ce premier élément : « ' + evidence[0].text + ' »';
   return evidence[0].text;
 }
+export function reviewSummary(history) {
+  const reviewed = history.filter(t => t.review);
+  if (!reviewed.length) return [];
+  const expected = reviewed.filter(t => ['Réponse utile', 'Réponse incorrecte', 'Question pour moi manquée'].includes(t.review));
+  const useful = expected.filter(t => t.review === 'Réponse utile');
+  const fast = useful.filter(t => Number.isFinite(t.record?.timing?.first) && t.record.timing.first < 1000);
+  const timings = useful.map(t => t.record?.timing?.first).filter(Number.isFinite).sort((a,b)=>a-b);
+  const falseTriggers = reviewed.filter(t => t.review === 'Question pour un autre participant').length;
+  const lines = ['## Évaluation manuelle', '', reviewed.length+' interventions évaluées.'];
+  if(expected.length) lines.push(fast.length+' / '+expected.length+' questions adressées ont reçu une suggestion jugée utile et mesurée en moins d’une seconde.');
+  if(timings.length) lines.push('P95 des suggestions utiles chronométrées : '+timings[Math.ceil(timings.length*.95)-1]+' ms ('+timings.length+' mesures).');
+  lines.push('Suggestions adressées à tort : '+falseTriggers+'.','');
+  return lines;
+}
