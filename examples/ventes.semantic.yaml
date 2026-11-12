@@ -1,0 +1,100 @@
+# Couche sémantique de la base de démonstration « ventes » (qraft-eval demo-db).
+# C'est ici que vit la connaissance métier absente du schéma : ce que « chiffre
+# d'affaires » veut dire, quelle colonne date une commande, quelles commandes exclure.
+
+domain: ventes
+dialect: duckdb
+
+entities:
+  clients:
+    label: clients
+    synonyms: [client, clientèle, compte, comptes]
+    time_column: date_creation
+  commandes:
+    label: commandes
+    synonyms: [commande, achat, achats]
+    time_column: date_commande
+  produits:
+    label: produits
+    synonyms: [produit, article, articles, référence, références]
+  paiements:
+    label: paiements
+    synonyms: [paiement, règlement, règlements, encaissement]
+    time_column: date_paiement
+  lignes_commande:
+    label: lignes de commande
+    time_column: commandes.date_commande
+
+metrics:
+  ca:
+    label: chiffre d'affaires
+    synonyms: [CA, chiffre d'affaires, chiffres d'affaires, ventes, revenu, revenus]
+    expression: SUM(lignes_commande.quantite * lignes_commande.prix_unitaire)
+    table: lignes_commande
+    filters: ["commandes.statut = 'payee'"]
+    time_column: commandes.date_commande
+    unit: EUR
+    description: Montant des lignes des commandes payées (hors commandes annulées, en attente ou de test).
+  nb_commandes:
+    label: nombre de commandes payées
+    synonyms: [nombre de commandes payées]
+    expression: COUNT(DISTINCT commandes.commande_id)
+    table: commandes
+    filters: ["commandes.statut = 'payee'"]
+    time_column: commandes.date_commande
+  panier_moyen:
+    label: panier moyen
+    synonyms: [panier moyen, valeur moyenne des commandes]
+    expression: "{ca} / {nb_commandes}"
+    unit: EUR
+  quantite_vendue:
+    label: quantité vendue
+    synonyms: [quantité vendue, quantités vendues, vendus en quantité, plus vendus, volume vendu]
+    expression: SUM(lignes_commande.quantite)
+    table: lignes_commande
+    filters: ["commandes.statut = 'payee'"]
+    time_column: commandes.date_commande
+  encaisse:
+    label: montant encaissé
+    synonyms: [montant encaissé, encaissé, encaissements, montant total encaissé, paiements reçus]
+    expression: SUM(paiements.montant)
+    table: paiements
+    time_column: paiements.date_paiement
+    unit: EUR
+
+dimensions:
+  region:
+    label: région
+    column: regions.nom
+    synonyms: [région, régions]
+  segment:
+    label: segment de clientèle
+    column: clients.segment
+    synonyms: [segment, segments, segment de clientèle, type de client]
+  categorie:
+    label: catégorie de produit
+    column: produits.categorie
+    synonyms: [catégorie, catégories, catégorie de produit, famille de produit]
+  canal:
+    label: canal de vente
+    column: commandes.canal
+    synonyms: [canal, canaux, canal de vente]
+  produit:
+    label: produit
+    column: produits.nom
+    synonyms: [produit, produits, article]
+  client:
+    label: client
+    column: clients.nom
+    synonyms: [client, clients]
+
+values:
+  - column: regions.code
+    value: IDF
+    synonyms: [région parisienne, Paris et sa région]
+  - column: commandes.statut
+    value: payee
+    synonyms: [payée, payées, réglée, réglées]
+  - column: commandes.canal
+    value: web
+    synonyms: [en ligne, internet, site web]
