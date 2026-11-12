@@ -22,7 +22,7 @@ from typing import Any, Protocol
 from .catalog import infer_foreign_keys, introspect, profile
 from .compiler import Compiled, Compiler
 from .confidence import Calibrator, Confidence, estimate
-from .execute import Result, Source, SourceError
+from .execute import ArrowSource, Result, Source, SourceError
 from .explain import Explainer
 from .graph import CompileError, KnowledgeGraph, KnowledgePack
 from .models import ModelPort
@@ -140,11 +140,13 @@ class Engine:
         self.calibrator = calibrator
         self._cache: OrderedDict[tuple[str, ...], tuple[Intent, str, float]] = OrderedDict()
         self._cache_size = cache_size
+        self._cache_lock = threading.Lock()
 
     @classmethod
     def from_url(cls, url: str, *, semantic: str | Path | None = None, pack: str | Path | None = None,
-                 rebuild: bool = False, schema: str | None = None, **kwargs: Any) -> Engine:
-        source = Source(url)
+                 rebuild: bool = False, schema: str | None = None, arrow: bool = False, **kwargs: Any) -> Engine:
+        """arrow=True : lecture Arrow native (DuckDB, ConnectorX) quand c'est possible."""
+        source = ArrowSource(url) if arrow else Source(url)
         if pack and Path(pack).exists() and not rebuild:
             graph = KnowledgeGraph.from_pack(KnowledgePack.load(pack))
             if semantic:  # la couche sémantique peut évoluer sans réindexer la base
@@ -194,9 +196,12 @@ class Engine:
         parse = self.parser.parse(question, previous.intent if previous else None)
         candidates: list[Intent] = []
         coverage = parse.coverage
-        if key in self._cache:
-            intent, route, coverage = self._cache[key]
-            self._cache.move_to_end(key)
+        with self._cache_lock:
+            cached = self._cache.get(key)
+            if cached is not None:
+                self._cache.move_to_end(key)
+        if cached is not None:
+            intent, route, coverage = cached
             candidates, answer.route = [intent], "cache"
         elif parse.handled and parse.coverage >= MIN_RULE_COVERAGE:
             candidates, answer.route = [parse.intent], "regles"
@@ -291,9 +296,10 @@ class Engine:
                                      candidates_agree=agree, uncertified=uncertified, calibrator=self.calibrator)
         answer.status = "ok" if answer.confidence.score >= self.min_confidence else "a_confirmer"
         if answer.route != "cache":
-            self._cache[key] = (intent, answer.route, coverage)
-            if len(self._cache) > self._cache_size:
-                self._cache.popitem(last=False)
+            with self._cache_lock:
+                self._cache[key] = (intent, answer.route, coverage)
+                if len(self._cache) > self._cache_size:
+                    self._cache.popitem(last=False)
         timings["total"] = round(1000 * (time.perf_counter() - started), 1)
         answer.timings_ms = timings
         self._record(answer, identity)

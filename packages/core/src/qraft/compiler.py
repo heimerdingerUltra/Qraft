@@ -19,6 +19,7 @@ from typing import Any
 import sqlglot
 from sqlglot import exp
 
+from .catalog import key_column
 from .graph import CompileError, JoinPlan, KnowledgeGraph
 from .policy import Identity, Policy, PolicyViolation, check_columns, check_read_only, check_tree, row_filter
 from .qir import GRAIN_ALIASES, Filter, Intent, Measure, TimeScope
@@ -298,9 +299,9 @@ class Compiler:
         for atom in atoms:
             expr = atom.expr
             if fanout and isinstance(expr, exp.Count) and isinstance(expr.this, exp.Star):
-                pk = self.graph.table(base).primary_key
-                if len(pk) == 1:
-                    expr = exp.Count(this=exp.Distinct(expressions=[_col(f"{base}.{pk[0]}")]))
+                key = key_column(self.graph.table(base))
+                if key is not None:
+                    expr = exp.Count(this=exp.Distinct(expressions=[_col(f"{base}.{key.name}")]))
             selected.append(exp.alias_(expr, atom.alias))
         query = exp.select(*selected).from_(exp.to_table(base))
         for step in plan.steps:

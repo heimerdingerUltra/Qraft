@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qraft-server"
+version = "0.1.0"
+description = "Passerelle Qraft : API REST, flux SSE, export Arrow et serveur MCP."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "qraft",
+    "starlette>=0.40",
+    "sse-starlette>=2.1",
+    "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.2"]
+arrow = ["pyarrow>=17"]
+dev = ["pytest>=8.4", "httpx>=0.27"]
+
+[project.scripts]
+qraft-mcp = "qraft_server.mcp_server:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qraft_server"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

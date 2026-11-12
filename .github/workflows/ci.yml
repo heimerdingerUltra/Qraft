@@ -1,0 +1,31 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Installation
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "packages/qraft-eval[baseline,duckdb,dev]" -e "packages/core[duckdb,arrow,claude,local,dev]" -e "packages/server[mcp,arrow,dev]"
+          if [ -d packages/forge ]; then pip install -e "packages/forge[dev]"; fi
+      - name: Tests (un paquet à la fois : chaque paquet a son dossier tests)
+        run: |
+          for pkg in qraft-eval core server forge; do
+            if [ -d "packages/$pkg/tests" ]; then pytest "packages/$pkg" -q; fi
+          done
+      - name: Évaluation du moteur sur la démo
+        run: |
+          qraft-eval demo-db
+          qraft-eval baseline phase0/goldsets/demo_ventes.yaml --db-url duckdb:///phase0/demo/ventes.duckdb --generator engine --semantic examples/ventes.semantic.yaml

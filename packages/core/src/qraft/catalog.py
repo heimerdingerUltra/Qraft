@@ -238,15 +238,33 @@ def profile(engine: Engine, catalog: Catalog, *, max_values: int = 200) -> Catal
 _ID_SUFFIX = re.compile(r"^(?P<stem>.+?)_?(id|code|key|num)$", re.IGNORECASE)
 
 
+def key_column(table: Table) -> Column | None:
+    """Clé d'une table : sa clé primaire mono-colonne, sinon une colonne « id » unique et non nulle (profilée).
+
+    Les entrepôts de données déclarent rarement leurs clés : l'unicité observée en tient lieu.
+    """
+    if len(table.primary_key) == 1:
+        return table.column(table.primary_key[0])
+    if table.rows is None:
+        return None
+    stems = {table.name.lower(), table.name.lower().rstrip("s"), table.name.lower().rstrip("x")}
+    for col in table.columns:
+        match = _ID_SUFFIX.match(col.name)
+        named_like_key = col.name.lower() == "id" or (match and match.group("stem").lower().rstrip("_") in stems)
+        if named_like_key and col.distinct == table.rows and col.nulls == 0 and table.rows > 0:
+            return col
+    return None
+
+
 def _candidate_targets(col: Column, owner: Table, catalog: Catalog) -> list[tuple[Table, Column]]:
-    """Tables dont la clé primaire (une seule colonne) porte un nom compatible avec col."""
+    """Tables dont la clé (déclarée ou observée) porte un nom compatible avec col."""
     candidates = []
     match = _ID_SUFFIX.match(col.name)
     stem = (match.group("stem") if match else col.name).lower().rstrip("_")
     for target in catalog.tables.values():
-        if target.name == owner.name or len(target.primary_key) != 1:
+        if target.name == owner.name:
             continue
-        pk = target.column(target.primary_key[0])
+        pk = key_column(target)
         if pk is None or pk.is_text != col.is_text:
             continue
         names = {target.name.lower(), target.name.lower().rstrip("s"), target.name.lower().rstrip("x")}
@@ -265,8 +283,11 @@ def infer_foreign_keys(engine: Engine, catalog: Catalog, *, min_inclusion: float
     with engine.connect() as conn:
         for owner in catalog.tables.values():
             declared = {fk.column.lower() for fk in owner.foreign_keys}
+            own_key = key_column(owner)
             for col in owner.columns:
                 if col.name.lower() in declared or col.name in owner.primary_key or col.is_temporal:
+                    continue
+                if own_key is not None and col.name == own_key.name:
                     continue
                 for target, pk in _candidate_targets(col, owner, catalog):
                     child = table(owner.name, column(col.name), schema=catalog.schema).alias("enfant")

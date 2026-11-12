@@ -1,0 +1,34 @@
+# Pile de démonstration : base de démo DuckDB générée au démarrage + passerelle Qraft.
+# docker compose -f deploy/docker-compose.yml up --build
+# Puis : curl -X POST localhost:8080/v1/questions -H "content-type: application/json" \
+#          -d '{"question": "Chiffre d'\''affaires 2025 par région"}'
+
+services:
+  demo-db:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    command: ["qraft-eval", "demo-db", "--out", "/data/ventes.duckdb"]
+    volumes:
+      - qraft-data:/data
+    user: "0"
+
+  qraft:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    depends_on:
+      demo-db:
+        condition: service_completed_successfully
+    environment:
+      QRAFT_DB_URL: "duckdb:////data/ventes.duckdb"
+      QRAFT_SEMANTIC: "/app/examples/ventes.semantic.yaml"
+      QRAFT_MODEL: "none"          # claude : définir aussi ANTHROPIC_API_KEY
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+    volumes:
+      - qraft-data:/data:ro
+    ports:
+      - "8080:8080"
+
+volumes:
+  qraft-data:

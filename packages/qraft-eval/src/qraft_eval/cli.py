@@ -101,14 +101,23 @@ def cmd_baseline(args: argparse.Namespace) -> int:
                                  goldset.dialect)
     n_questions = min(args.limit, len(goldset.questions)) if args.limit else len(goldset.questions)
 
-    if args.dry_run:
+    if args.dry_run and args.generator == "claude":
         print("Simulation : aucun appel au modèle.")
         _print_estimate(prompt, n_questions, args.model)
         return 0
 
     started_at = datetime.now()
-    generator = ClaudeGenerator(prompt, model=args.model, effort=args.effort, fallbacks=not args.no_fallbacks)
-    print(f"Baseline : {n_questions} questions, modèle {args.model}, effort {args.effort}.")
+    if args.generator == "engine":
+        from qraft import Engine
+
+        from .engine_gen import EngineGenerator
+
+        engine_obj = Engine.from_url(_db_url(args), semantic=args.semantic)
+        generator = EngineGenerator(engine_obj)
+        args.model, args.effort = generator.model, "-"
+    else:
+        generator = ClaudeGenerator(prompt, model=args.model, effort=args.effort, fallbacks=not args.no_fallbacks)
+    print(f"Évaluation : {n_questions} questions, générateur {args.model}, effort {args.effort}.")
     results = run_baseline(
         goldset, engine, generator, concurrency=args.concurrency, limit=args.limit, max_rows=args.max_rows,
         on_progress=lambda done, total, qid: print(f"  {done}/{total} {qid}", flush=True),
@@ -171,6 +180,9 @@ def build_parser() -> argparse.ArgumentParser:
     baseline.add_argument("--limit", type=int, help="n'évalue que les N premières questions")
     baseline.add_argument("--out", default="phase0/results")
     baseline.add_argument("--dry-run", action="store_true", help="estime le coût sans appeler le modèle")
+    baseline.add_argument("--generator", default="claude", choices=["claude", "engine"],
+                          help="claude : baseline grand modèle ; engine : moteur Qraft (paquet qraft)")
+    baseline.add_argument("--semantic", help="couche sémantique YAML pour --generator engine")
     baseline.set_defaults(func=cmd_baseline)
     return parser
 
