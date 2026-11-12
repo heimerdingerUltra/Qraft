@@ -1,0 +1,98 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f2f2ec;
+  color: #1b322d;
+  font:
+    16px/1.5 'Segoe UI',
+    sans-serif;
+}
+main {
+  max-width: 850px;
+  margin: auto;
+  padding: 40px 20px;
+}
+header span,
+small {
+  font-weight: 650;
+  color: #4a6960;
+}
+header span {
+  letter-spacing: 0.16em;
+  font-size: 12px;
+}
+h1 {
+  font:
+    clamp(34px, 5vw, 52px)/1.1 Georgia,
+    serif;
+  margin: 10px 0;
+}
+h2 {
+  font-size: 19px;
+  margin: 0 0 12px;
+}
+section {
+  background: white;
+  padding: 22px 26px;
+  margin: 14px 0;
+  border-radius: 12px;
+}
+p {
+  margin: 8px 0 14px;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  background: #185b4d;
+  color: white;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  margin: 4px 1px;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.45;
+}
+input {
+  max-width: 100%;
+}
+.result {
+  border-left: 5px solid #347565;
+}
+blockquote {
+  font:
+    24px/1.45 Georgia,
+    serif;
+  margin: 10px 0;
+}
+#source {
+  white-space: pre-line;
+  color: #456058;
+}
+#latency {
+  font-variant-numeric: tabular-nums;
+}
+#deep p {
+  margin: 8px 0;
+}
+select {
+  font: inherit;
+  padding: 5px;
+}
+summary {
+  cursor: pointer;
+}
+#history li {
+  margin: 6px 0;
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid #a35a15;
+  outline-offset: 2px;
+}

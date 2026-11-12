@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Assistant de réunion</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <span>ESPACE DE RÉUNION</span>
+        <h1>Assistant de réunion</h1>
+        <p id="status" role="status">Prêt</p>
+      </header>
+      <section>
+        <h2>Dossier de réunion</h2>
+        <label
+          >Ajouter des documents PDF ou PowerPoint
+          <input id="files" type="file" multiple accept=".pdf,.pptx"
+        /></label>
+        <p id="docs">Aucun document importé</p>
+      </section>
+      <section>
+        <h2>Écoute</h2>
+        <label>Mon prénom <input id="name" placeholder="Camille" /></label>
+        <p>
+          Sur le web, partage ton onglet Teams ou Meet avec son audio. Pour
+          Teams Desktop, ouvre l’application Windows puis choisis son bouton
+          d’écoute. L’audio est transmis à Deepgram.
+        </p>
+        <label
+          >Scénario
+          <select id="scenario">
+            <option value="simple">Question sur le budget</option>
+            <option value="decision">Décision et changement de plafond</option>
+          </select></label
+        ><br /><button id="demo">Démo hors ligne</button>
+        <button id="cloud">Démo avec Deepgram</button>
+        <button id="live">Écouter mon onglet</button>
+        <button id="teams">Écouter Teams Desktop</button>
+        <button id="stop" disabled>Arrêter</button>
+      </section>
+      <section>
+        <h2>Transcription</h2>
+        <label
+          >Interlocuteurs
+          <meter id="remote-level" min="0" max="1" value="0"></meter
+        ></label>
+        <p id="remote">—</p>
+        <label
+          >Mon micro <meter id="local-level" min="0" max="1" value="0"></meter
+        ></label>
+        <p id="local">—</p>
+      </section>
+      <section class="result">
+        <h2>Suggestion immédiate</h2>
+        <p id="preview" aria-live="polite"></p>
+        <blockquote id="answer">En attente d’une question.</blockquote>
+        <p id="source"></p>
+        <p id="latency"></p>
+        <h3>Analyse approfondie</h3>
+        <div id="deep" aria-live="polite">—</div>
+        <button id="manual">Rechercher sur la dernière intervention</button>
+      </section>
+      <section>
+        <details>
+          <summary>Historique de la réunion</summary>
+          <button id="export" disabled>Exporter le compte rendu</button>
+          <ol id="history"></ol>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

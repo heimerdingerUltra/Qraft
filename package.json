@@ -1,0 +1,31 @@
+{
+  "name": "assistant-reunion",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "node --test",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "desktop:build": "node scripts/tauri.mjs build --no-bundle",
+    "desktop:dev": "node scripts/tauri.mjs dev",
+    "desktop:test": "node scripts/check-desktop.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.1.0",
+    "@tesseract.js-data/fra": "^1.0.0",
+    "fast-xml-parser": "^5.12.0",
+    "jszip": "^3.10.2",
+    "loopback-capture": "^4.0.0",
+    "pdfjs-dist": "^6.5.438",
+    "tesseract.js": "^7.0.0",
+    "ws": "^8.22.2"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.4",
+    "playwright-core": "^1.65.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "Assistant de réunion",
+  "version": "1.0.0",
+  "identifier": "local.reunion.assistant",
+  "build": {},
+  "app": { "windows": [] },
+  "bundle": { "active": false, "icon": ["icons/icon.ico"] }
+}
