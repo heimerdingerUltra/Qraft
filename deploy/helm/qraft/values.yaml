@@ -1,0 +1,32 @@
+image:
+  repository: qraft
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+# Secret Kubernetes existant contenant QRAFT_DB_URL (compte en lecture seule) et, au besoin,
+# ANTHROPIC_API_KEY, QRAFT_SLACK_SIGNING_SECRET, QRAFT_SLACK_BOT_TOKEN.
+existingSecret: qraft-secrets
+
+config:
+  model: none                 # none | claude | local
+  semanticPath: /config/semantic.yaml
+  trustIdentityHeaders: "1"   # uniquement derrière une passerelle qui authentifie (OIDC)
+
+# Couche sémantique montée depuis une ConfigMap (contenu du fichier YAML).
+semantic: |
+  domain: defaut
+
+resources:
+  requests: { cpu: 500m, memory: 1Gi }
+  limits: { cpu: "2", memory: 4Gi }
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+service:
+  port: 8080

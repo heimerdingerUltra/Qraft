@@ -133,12 +133,16 @@ def shift_scope(scope: TimeScope) -> TimeScope:
 
 
 class Compiler:
-    def __init__(self, graph: KnowledgeGraph, *, policy: Policy | None = None, identity: Identity | None = None) -> None:
+    def __init__(self, graph: KnowledgeGraph, *, policy: Policy | None = None, identity: Identity | None = None,
+                 known_at: str | None = None) -> None:
         self.graph = graph
         self.policy = policy or Policy()
         self.identity = identity or Identity()
         self.read_dialect = graph.dialect
         self.write_dialect = graph.catalog.dialect
+        self.as_of: str | None = None  # date métier qui choisit la version des métriques (début de période)
+        self.known_at: str | None = known_at  # temps de connaissance (reproductibilité)
+        self._report: Compiled | None = None
 
     # --- Résolution -------------------------------------------------------------------------
 
@@ -175,7 +179,11 @@ class Compiler:
         return builders[f.op]()
 
     def _atomic_metric(self, metric_id: str, alias: str, extra: list[exp.Expression], hidden: bool) -> Atom:
-        metric = self.graph.metric(metric_id)
+        metric, version = self.graph.metric(metric_id).at(self.as_of, known_at=self.known_at)
+        if version is not None and self._report is not None:
+            note = f"définition de « {metric.label or metric.id} » en vigueur depuis le {version.valid_from}"
+            if note not in self._report.rules:
+                self._report.rules.append(note + (f" ({version.note})" if version.note else ""))
         expr = self._parse(metric.expression)
         tables = _tables_of(expr)
         base = metric.table or (next(iter(tables)) if len(tables) == 1 else None)
@@ -261,6 +269,9 @@ class Compiler:
             if tc is None:
                 report.warnings.append(f"aucune colonne temporelle pour {base} : la période est ignorée")
             else:
+                used = report.signals.setdefault("time_columns", [])
+                if tc not in used:
+                    used.append(tc)
                 if scope.start:
                     where.append(exp.GTE(this=_col(tc), expression=_date(scope.start)))
                 if scope.end:
@@ -465,8 +476,11 @@ class Compiler:
         assert scope is not None and scope.compare
         if any(d.column == "time" or d.grain for d in intent.dimensions):
             raise CompileError("comparaison temporelle avec un regroupement par période : non pris en charge en v0")
+        previous_scope = shift_scope(scope)
+        self.as_of = scope.start  # chaque période prend la définition en vigueur à son début
         current, dims, cols = self._measures_query(intent, scope, "c_", report)
-        previous, _, _ = self._measures_query(intent, shift_scope(scope), "p_", report)
+        self.as_of = previous_scope.start
+        previous, _, _ = self._measures_query(intent, previous_scope, "p_", report)
         measure_cols = cols[len(dims):]
         hoisted = []
         for q in (current, previous):
@@ -505,6 +519,8 @@ class Compiler:
     def compile(self, intent: Intent) -> Compiled:
         report = Compiled(sql="", dialect=self.write_dialect, ast=exp.Select(), columns=[])
         report.assumptions += list(intent.assumptions)
+        self._report = report
+        self.as_of = intent.time.start if intent.time else None
         if intent.escape_sql:
             return self._compile_escape(intent.escape_sql, report)
         if intent.time and intent.time.compare:

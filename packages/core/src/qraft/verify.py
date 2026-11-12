@@ -225,10 +225,9 @@ def plausibility(result: Result, compiled: Compiled, graph: KnowledgeGraph, scop
     if compiled.signals.get("fanout"):
         checks.warnings.append("risque de double comptage : une dimension est plus fine que la mesure")
     if scope_end:
-        for name in compiled.tables:
-            tc = graph.time_column(name)
-            if not tc:
-                continue
+        # Seules les colonnes temporelles qui filtrent réellement la période comptent.
+        for tc in compiled.signals.get("time_columns", []):
+            name = tc.split(".")[0]
             _, col = graph.column(tc)
             if col.max and col.max[:10] < (date.fromisoformat(scope_end) - timedelta(days=1)).isoformat() \
                     and col.max[:10] >= (date.fromisoformat(scope_end) - timedelta(days=400)).isoformat():

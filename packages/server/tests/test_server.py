@@ -30,6 +30,11 @@ def test_health(client):
     assert data["status"] == "ok" and data["tables"] == 6
 
 
+def test_web_interface_is_served(client):
+    page = client.get("/")
+    assert page.status_code == 200 and "EventSource" in page.text and "/v1/questions/stream" in page.text
+
+
 def test_ask_follow_up_feedback_and_result(client):
     first = client.post("/v1/questions", json={"question": "Chiffre d'affaires 2025 par région"}).json()
     assert first["status"] == "ok" and len(first["rows"]) == 6

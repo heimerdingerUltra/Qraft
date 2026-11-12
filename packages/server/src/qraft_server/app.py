@@ -9,7 +9,9 @@ import anyio
 from sse_starlette.sse import EventSourceResponse
 from starlette.applications import Starlette
 from starlette.requests import Request
-from starlette.responses import JSONResponse, Response
+from pathlib import Path
+
+from starlette.responses import FileResponse, JSONResponse, Response
 from starlette.routing import Route
 
 from qraft import Engine, Identity, __version__
@@ -17,6 +19,7 @@ from qraft import Engine, Identity, __version__
 from .store import AnswerStore, search_lexicon
 
 ROWS_PER_EVENT = 500
+STATIC = Path(__file__).parent / "static"
 
 
 def _identity(request: Request, trust_headers: bool, default: Identity) -> Identity:
@@ -33,7 +36,9 @@ def _identity(request: Request, trust_headers: bool, default: Identity) -> Ident
     return Identity(user=user, attributes={str(k): str(v) for k, v in attributes.items()})
 
 
-def create_app(engine: Engine, *, trust_identity_headers: bool = False, store: AnswerStore | None = None) -> Starlette:
+def create_app(engine: Engine, *, trust_identity_headers: bool = False, store: AnswerStore | None = None,
+               slack: Any | None = None) -> Starlette:
+    """slack : SlackConfig (qraft_server.slack) pour activer le bot sur /slack/events."""
     answers = store or AnswerStore()
 
     async def health(request: Request) -> JSONResponse:
@@ -128,7 +133,17 @@ def create_app(engine: Engine, *, trust_identity_headers: bool = False, store: A
             for m in sorted(engine.graph.semantic.metrics.values(), key=lambda m: m.id)]
         return JSONResponse({"metrics": metrics})
 
-    return Starlette(routes=[
+    async def home(request: Request) -> Response:
+        return FileResponse(STATIC / "index.html", media_type="text/html; charset=utf-8")
+
+    extra = []
+    if slack is not None:
+        from .slack import slack_endpoint
+
+        extra.append(Route("/slack/events", slack_endpoint(engine, slack), methods=["POST"]))
+
+    return Starlette(routes=extra + [
+        Route("/", home),
         Route("/v1/health", health),
         Route("/v1/questions", ask, methods=["POST"]),
         Route("/v1/questions/stream", stream),
@@ -140,6 +155,16 @@ def create_app(engine: Engine, *, trust_identity_headers: bool = False, store: A
 
 
 def run(engine: Engine, *, host: str = "127.0.0.1", port: int = 8080, trust_identity_headers: bool = False) -> None:
+    """Sert l'API. Le bot Slack s'active si QRAFT_SLACK_SIGNING_SECRET et QRAFT_SLACK_BOT_TOKEN sont définis."""
+    import os
+
     import uvicorn
 
-    uvicorn.run(create_app(engine, trust_identity_headers=trust_identity_headers), host=host, port=port)
+    slack = None
+    secret, token = os.environ.get("QRAFT_SLACK_SIGNING_SECRET"), os.environ.get("QRAFT_SLACK_BOT_TOKEN")
+    if secret and token:
+        from .slack import HttpSlackClient, SlackConfig
+
+        slack = SlackConfig(signing_secret=secret, client=HttpSlackClient(token))
+    trust = trust_identity_headers or os.environ.get("QRAFT_TRUST_IDENTITY_HEADERS") == "1"
+    uvicorn.run(create_app(engine, trust_identity_headers=trust, slack=slack), host=host, port=port)

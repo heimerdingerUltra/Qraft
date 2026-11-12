@@ -14,6 +14,19 @@ import msgspec
 import yaml
 
 
+class MetricVersion(msgspec.Struct, forbid_unknown_fields=True):
+    """Définition datée d'une métrique (temps de validité métier) : ce qui change à partir de valid_from."""
+
+    valid_from: str  # date ISO incluse
+    valid_to: str | None = None  # date ISO exclue
+    expression: str | None = None
+    filters: list[str] | None = None
+    table: str | None = None
+    time_column: str | None = None
+    known_since: str | None = None  # temps de connaissance : date d'enregistrement de cette définition
+    note: str | None = None
+
+
 class Metric(msgspec.Struct, forbid_unknown_fields=True):
     id: str
     expression: str  # agrégat SQL, ou formule de métriques « {ca} / {nb_commandes} »
@@ -25,10 +38,35 @@ class Metric(msgspec.Struct, forbid_unknown_fields=True):
     unit: str | None = None
     description: str | None = None
     certified: bool = True
+    versions: list[MetricVersion] = msgspec.field(default_factory=list)
 
     @property
     def is_composite(self) -> bool:
         return "{" in self.expression
+
+    def at(self, day: str | None, *, known_at: str | None = None) -> tuple[Metric, MetricVersion | None]:
+        """Définition en vigueur à une date métier, telle que connue à known_at (bitemporel).
+
+        Sans date, la définition de base s'applique. Une version enregistrée après known_at est ignorée,
+        ce qui rend une réponse passée reproductible à l'identique.
+        """
+        if not day or not self.versions:
+            return self, None
+        candidates = [v for v in self.versions
+                      if v.valid_from <= day and (v.valid_to is None or day < v.valid_to)
+                      and (known_at is None or v.known_since is None or v.known_since <= known_at)]
+        if not candidates:
+            return self, None
+        version = max(candidates, key=lambda v: v.valid_from)
+        effective = msgspec.structs.replace(
+            self,
+            expression=version.expression or self.expression,
+            filters=self.filters if version.filters is None else version.filters,
+            table=version.table or self.table,
+            time_column=version.time_column or self.time_column,
+            versions=[],
+        )
+        return effective, version
 
 
 class Dimension(msgspec.Struct, forbid_unknown_fields=True):

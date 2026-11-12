@@ -19,6 +19,7 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Protocol
 
+from . import telemetry
 from .catalog import infer_foreign_keys, introspect, profile
 from .compiler import Compiled, Compiler
 from .confidence import Calibrator, Confidence, estimate
@@ -187,6 +188,14 @@ class Engine:
 
     def ask(self, question: str, *, previous: Answer | None = None, execute: bool = True,
             identity: Identity | None = None) -> Answer:
+        with telemetry.span("qraft.ask", graph_version=self.graph.version, execute=execute) as current:
+            answer = self._ask(question, previous=previous, execute=execute, identity=identity)
+            telemetry.annotate(current, route=answer.route, status=answer.status,
+                               confidence=answer.confidence.score if answer.confidence else None,
+                               rows=len(answer.rows), **{f"ms_{k}": v for k, v in answer.timings_ms.items()})
+            return answer
+
+    def _ask(self, question: str, *, previous: Answer | None, execute: bool, identity: Identity | None) -> Answer:
         identity = identity or self.identity
         timings: dict[str, float] = {}
         started = time.perf_counter()
