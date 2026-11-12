@@ -32,6 +32,8 @@ def test_parser_understands_periods_rankings_and_values(graph):
     assert intent.time.start == "2025-04-01" and intent.time.end == "2025-07-01"
     assert Filter(column="commandes.canal", value="web") in intent.filters
     assert parser.parse("Quels clients n'ont jamais commandé ?").handled is False
+    march = parser.parse("Chiffre d'affaires en mars 2025").intent.time
+    assert (march.start, march.end) == ("2025-03-01", "2025-04-01")
 
 
 def test_follow_up_extends_previous_intent(engine):

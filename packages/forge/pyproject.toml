@@ -1,0 +1,32 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "qraft-forge"
+version = "0.1.0"
+description = "Forge de Qraft : compile une base en paires question -> QIR vérifiées par exécution, puis en adapter LoRA."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "qraft",
+    "msgspec>=0.19",
+    "typer>=0.15",
+    "rich>=13",
+]
+
+[project.optional-dependencies]
+# Paraphrase des questions par Claude (API Message Batches).
+claude = ["anthropic>=0.75"]
+# Entraînement SFT LoRA puis GRPO : GPU nécessaire (voir train.py).
+train = ["trl>=0.21", "peft>=0.15", "transformers>=4.55", "datasets>=3.6", "torch>=2.6"]
+dev = ["pytest>=8.4"]
+
+[project.scripts]
+qraft-forge = "qraft_forge.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/qraft_forge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

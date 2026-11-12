@@ -21,7 +21,7 @@ def norm(text: str) -> str:
 
 # Mots terminés par s ou x qui ne sont pas des pluriels.
 _INVARIABLE = frozenset({
-    "mois", "pays", "fois", "prix", "poids", "temps", "cours", "corps", "bois", "choix", "plus", "moins",
+    "mois", "mars", "pays", "fois", "prix", "poids", "temps", "cours", "corps", "bois", "choix", "plus", "moins",
     "sans", "dans", "chez", "sous", "vers", "tres", "apres", "depuis", "jamais", "toujours", "alors",
     "avons", "nous", "vous", "sont", "taux", "repas", "relais", "detail", "francais", "anglais",
 })
