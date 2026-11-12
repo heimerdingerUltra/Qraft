@@ -127,7 +127,9 @@ class Engine:
         events: EventSink | None = None,
         calibrator: Calibrator | None = None,
         cache_size: int = 512,
+        router: Any | None = None,
     ) -> None:
+        self.router = router  # LearnedRouter optionnel ; à défaut, seuil fixe de couverture
         self.source = source
         self.graph = graph
         self.model = model
@@ -212,7 +214,8 @@ class Engine:
         if cached is not None:
             intent, route, coverage = cached
             candidates, answer.route = [intent], "cache"
-        elif parse.handled and parse.coverage >= MIN_RULE_COVERAGE:
+        elif parse.handled and (self.router.trust_rules(parse, question) if self.router is not None
+                                else parse.coverage >= MIN_RULE_COVERAGE):
             candidates, answer.route = [parse.intent], "regles"
         elif self.model is not None:
             t = time.perf_counter()
